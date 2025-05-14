@@ -1,0 +1,18 @@
+# Spanish model test configuration without reference voice
+model = "F5TTS_v1_Base"
+# Path to your Spanish model checkpoint
+model_path = "C:/Users/User/Desktop/model_1250000.safetensors"
+# Path to your Spanish vocabulary file
+vocab_path = "C:/Users/User/Desktop/vocab.txt"
+# Using Spanish reference audio
+ref_audio = "C:/Users/User/Desktop/simivoz1min.wav"
+# Spanish reference text
+ref_text = "en honestidad, compromiso, confianza, generosidad, integridad, justicia y respeto. Y por eso mismo es que su trabajo, apego a los valores y constancias diarias. Les hacen destacar entre sus compañeros, porque así sabemos que estamos en la misma órbita. Felizmente para los primeros dos trimestres de 2022 entregamos un premio especial a los colaboradores más destacados en una premiación que sumó 68 420 estrellas, y este tercer trimestre lo cerramos con mucho más entusiasmo aún como cohete a la luna, donde durante julio hemos tenido la participación de más de 41,342 estrellas Abed, sumando ya un total de 109,762."
+# Text to generate
+gen_text = "La inteligencia artificial está transformando la forma en que interactuamos con la tecnología. Este es un ejemplo de síntesis de voz sin referencia."
+# Remove silence from generated audio
+remove_silence = true
+# Output directory
+output_dir = "tests"
+# Output filename
+output_file = "spanish_test_no_ref_output.wav" 
