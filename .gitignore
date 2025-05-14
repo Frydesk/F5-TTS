@@ -6,6 +6,10 @@ data/
 ckpts/
 wandb/
 results/
+reference/
+models/
+checkpoints/
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

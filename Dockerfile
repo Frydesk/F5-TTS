@@ -1,30 +1,51 @@
-FROM pytorch/pytorch:2.4.0-cuda12.4-cudnn9-devel
+FROM nvcr.io/nvidia/tritonserver:24.02-py3
 
-USER root
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    python3-pip \
+    python3-venv \
+    && rm -rf /var/lib/apt/lists/*
 
-ARG DEBIAN_FRONTEND=noninteractive
-
-LABEL github_repo="https://github.com/SWivid/F5-TTS"
-
-RUN set -x \
-    && apt-get update \
-    && apt-get -y install wget curl man git less openssl libssl-dev unzip unar build-essential aria2 tmux vim \
-    && apt-get install -y openssh-server sox libsox-fmt-all libsox-fmt-mp3 libsndfile1-dev ffmpeg \
-    && apt-get install -y librdmacm1 libibumad3 librdmacm-dev libibverbs1 libibverbs-dev ibverbs-utils ibverbs-providers \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
-    
+# Set working directory
 WORKDIR /workspace
 
+# Create and activate Python virtual environment
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Clone F5-TTS repository
 RUN git clone https://github.com/SWivid/F5-TTS.git \
     && cd F5-TTS \
-    && git submodule update --init --recursive \
-    && pip install -e . --no-cache-dir
+    && git submodule update --init --recursive
 
-ENV SHELL=/bin/bash
+# Install specific versions of core dependencies
+RUN pip install --no-cache-dir \
+    torch==2.7.0 \
+    torchaudio==2.7.0 \
+    fastapi==0.115.12 \
+    uvicorn==0.34.2 \
+    python-multipart==0.0.20 \
+    safetensors==0.5.3 \
+    pyyaml==6.0.2 \
+    numpy==2.2.5 \
+    starlette==0.46.2 \
+    click==8.2.0 \
+    pydantic==2.11.4
 
-VOLUME /root/.cache/huggingface/hub/
+# Install F5-TTS in the virtual environment
+RUN cd F5-TTS \
+    && pip install -e .
 
-EXPOSE 7860
+# Set environment variables
+ENV PYTHONPATH=/workspace/F5-TTS:$PYTHONPATH
+ENV TRITON_PYTHON_EXECUTABLE=/opt/venv/bin/python
 
-WORKDIR /workspace/F5-TTS
+# Copy model repository
+COPY model_repository /models
+
+# Expose Triton ports
+EXPOSE 8000 8001 8002
+
+# Start Triton server
+CMD ["tritonserver", "--model-repository=/models"]
