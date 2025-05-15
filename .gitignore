@@ -9,6 +9,9 @@ results/
 reference/
 models/
 checkpoints/
+tests/
+output/
+configs/
 
 
 # Byte-compiled / optimized / DLL files

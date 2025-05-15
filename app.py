@@ -8,14 +8,7 @@ import traceback
 import sys
 from pathlib import Path
 import torch
-import yaml
-from hydra.utils import get_class
-from f5_tts.infer.utils_infer import (
-    infer_process,
-    load_model,
-    load_vocoder,
-    preprocess_ref_audio_text
-)
+from f5_tts.api import F5TTS
 
 # Set up logging with more detailed format
 logging.basicConfig(
@@ -27,45 +20,11 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-# Initialize model and vocoder
-logger.info("Initializing model and vocoder...")
-model_dir = Path("checkpoints")
-logger.info(f"Model directory: {model_dir.absolute()}")
-
-vocoder = load_vocoder(
-    vocoder_name="vocos",
-    is_local=True,
-    local_path="vocos-mel-24khz",
-    device="cuda" if torch.cuda.is_available() else "cpu"
-)
-logger.info("Vocoder loaded successfully")
-
-# Load model configuration
-model_cfg_path = Path("src/f5_tts/configs/F5TTS_Base.yaml")
-logger.info(f"Loading model config from: {model_cfg_path.absolute()}")
-with open(model_cfg_path, 'r') as f:
-    model_cfg = yaml.safe_load(f)
-
-# Get the model class from the configuration
-model_cls = get_class(f"f5_tts.model.{model_cfg['model']['backbone']}")
-model_arc = model_cfg['model']['arch']
-logger.info(f"Model class: {model_cls.__name__}")
-
-# Set up model paths
-ckpt_path = str(model_dir / "model_1200000.safetensors")
-vocab_path = str(model_dir / "vocab.txt")
-logger.info(f"Checkpoint path: {ckpt_path}")
-logger.info(f"Vocabulary path: {vocab_path}")
-
-model = load_model(
-    model_cls=model_cls,
-    model_cfg=model_arc,
-    ckpt_path=ckpt_path,
-    mel_spec_type="vocos",
-    vocab_file=vocab_path,
-    device="cuda" if torch.cuda.is_available() else "cpu"
-)
-logger.info("Model loaded successfully")
+# Initialize TTS model
+logger.info("Initializing TTS model...")
+device = "cuda" if torch.cuda.is_available() else "cpu"
+tts_model = F5TTS(model='F5TTS_v1_Base', device=device)
+logger.info("TTS model loaded successfully")
 
 @app.post("/tts")
 async def tts(
@@ -112,36 +71,14 @@ async def tts(
         # Generate speech
         logger.info("Starting speech generation...")
         
-        # Preprocess reference audio
-        logger.info("Preprocessing reference audio...")
-        ref_audio, ref_text = preprocess_ref_audio_text(ref_path, ref_text)
-        logger.info(f"Reference audio shape: {ref_audio.shape}")
-        logger.info(f"Reference text: {ref_text}")
-        
-        # Generate speech
+        # Generate speech using the preloaded model
         logger.info("Running inference...")
-        audio_segment, final_sample_rate, _ = infer_process(
-            ref_audio,
-            ref_text,
-            text,
-            model,
-            vocoder,
-            mel_spec_type="vocos",
-            target_rms=0.1,
-            cross_fade_duration=0.15,
-            nfe_step=32,
-            cfg_strength=1.0,
-            sway_sampling_coef=-1,
-            speed=1.0,
-            fix_duration=None,
-            device="cuda" if torch.cuda.is_available() else "cpu"
-        )
+        audio_segment = tts_model.generate_speech(text, ref_path)
         logger.info(f"Generated audio shape: {audio_segment.shape}")
-        logger.info(f"Sample rate: {final_sample_rate}")
-
+        
         # Save the generated audio
         output_path = output_dir / "generated_speech.wav"
-        torchaudio.save(str(output_path), torch.from_numpy(audio_segment).unsqueeze(0), final_sample_rate)
+        tts_model.export_wav(audio_segment, str(output_path))
         logger.info(f"Saved generated audio to: {output_path}")
         
         # Verify the output file

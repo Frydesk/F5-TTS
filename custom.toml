@@ -3,7 +3,7 @@ model = "F5TTS_Base"
 ref_audio = "reference/reference.wav"
 # If an empty "", transcribes the reference audio automatically.
 ref_text = "Y por eso mismo es que su trabajo, apego a los valores y constancia diarias, les hacen destacar entre sus compañeros. Porque así sabemos que estamos en la misma órbita."
-gen_text = "texto en español, esto es una prueba larga de texto para ver que tanto se puede decir sin que se corte, y que están ahí por sus acciones con valor. En el Sistema Solar del Grupo por un País Mejor, tenemos mucho interés en el reconocimiento de quienes hacen posible que las cosas marchen hacia nuestra misión y visión. Por eso estamos orgullosos de ustedes. Del que parece vemos luz en una galaxia lejana, pero posible. Y ustedes han trabajado, crecido y reconocido que la entrega al trabajo y a los valores es la mejor acción. Por eso han nombrado a sus compañeros y les han otorgado estrellas ABET."
+gen_text = "¡Hola amigo! Soy el Dr. Simi y trabajo en las farmacias Similares y Similandias. Me encanta compartir sonrisas, consejos y abrazos con la gente mientras promovemos valores, salud y alegría. Mis actividades incluyen reforestaciones, voluntariados y a veces brindo consultas médicas y odontológicas en Función Best. ¡Saludos y espero que tengas un día lleno de felicidad!."
 # File with text to generate. Ignores the text above.
 gen_file = ""
 remove_silence = false

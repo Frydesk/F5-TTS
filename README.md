@@ -94,6 +94,18 @@ conda activate f5-tts
 > # git submodule update --init --recursive  # (optional, if need > bigvgan)
 > pip install -e .
 > ```
+>
+> ### 3. Quick Installation (Windows)
+>
+> ```bash
+> # Run the installation script
+> install_requirements.bat
+> ```
+> This script will:
+> - Create and activate a conda environment
+> - Install PyTorch with CUDA support
+> - Install all required dependencies
+> - Set up the project for both inference and training
 
 ### Docker usage also available
 ```bash
@@ -194,6 +206,77 @@ f5-tts_infer-cli -c custom.toml
 f5-tts_infer-cli -c src/f5_tts/infer/examples/multi/story.toml
 ```
 
+### 3. API Server
+
+The project includes a FastAPI server for TTS inference. This allows you to integrate F5-TTS into your applications via HTTP requests.
+
+#### Starting the API Server
+
+```bash
+# Start the API server using the provided batch file (Windows)
+tts-api.bat
+```
+
+The server will start on `http://localhost:8000` by default.
+
+#### API Endpoints
+
+- **POST /generate**
+  - Generates speech from text using a reference audio file
+  - Parameters:
+    - `text`: The text to convert to speech
+    - `reference_audio`: Reference audio file (WAV format)
+  - Returns: Generated audio file (WAV format)
+
+- **GET /health**
+  - Health check endpoint
+  - Returns: `{"status": "healthy"}`
+
+#### Testing the API
+
+A test script (`test_api.bat` for Windows) is provided to help test the API functionality:
+
+```bash
+# Run the test script
+test_api.bat
+```
+
+The test script provides two configuration methods:
+1. Using a custom TOML file
+2. Manual input of parameters
+
+Features:
+- Interactive configuration
+- Support for custom reference audio
+- Configurable output settings
+- Batch testing capability
+- Automatic environment setup
+- Automatic server startup and health checks
+
+#### API Client Example
+
+```python
+import requests
+
+# API endpoint
+url = "http://localhost:8000/generate"
+
+# Prepare the request
+files = {
+    'reference_audio': ('reference.wav', open('reference.wav', 'rb'), 'audio/wav')
+}
+data = {
+    'text': 'Text to convert to speech'
+}
+
+# Send request
+response = requests.post(url, files=files, data=data)
+
+# Save the generated audio
+if response.status_code == 200:
+    with open('output.wav', 'wb') as f:
+        f.write(response.content)
+```
 
 ## Training
 
