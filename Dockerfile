@@ -15,7 +15,7 @@ RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Clone F5-TTS repository
-RUN git clone https://github.com/SWivid/F5-TTS.git \
+RUN git clone https://github.com/Frydesk/F5-TTS.git \
     && cd F5-TTS \
     && git submodule update --init --recursive
 

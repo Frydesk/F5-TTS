@@ -8,4 +8,5 @@ pyyaml==6.0.2
 numpy==2.2.5
 starlette==0.46.2
 click==8.2.0
-pydantic==2.11.4 
+pydantic==2.11.4
+huggingface_hub==0.20.3 

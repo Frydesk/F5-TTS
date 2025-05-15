@@ -16,13 +16,13 @@ echo Installing PyTorch with CUDA support...
 pip install --pre torch==2.8.0.dev20250324 torchvision==0.22.0.dev20250325+cu128 torchaudio==2.6.0.dev20250325+cu128 --index-url https://download.pytorch.org/whl/nightly/cu128
 
 echo Installing required packages...
-pip install pyyaml safetensors huggingface_hub
+pip install pyyaml safetensors huggingface_hub fastapi uvicorn
+
+echo Installing ffmpeg...
+call conda install -c conda-forge ffmpeg -y
 
 echo Installing F5-TTS in editable mode...
 pip install -e .
-
-echo Installing f5-tts for inference
-pip install f5-tts
 
 echo Creating models directory structure...
 if not exist "models\vocos" mkdir "models\vocos"
