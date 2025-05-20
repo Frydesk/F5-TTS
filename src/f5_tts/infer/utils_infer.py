@@ -160,6 +160,7 @@ def initialize_asr_pipeline(device: str = device, dtype=None):
         model="openai/whisper-large-v3-turbo",
         torch_dtype=dtype,
         device=device,
+        model_kwargs={"use_flash_attention_2": True},  # Enable flash attention for better performance
     )
 
 
@@ -170,11 +171,17 @@ def transcribe(ref_audio, language=None):
     global asr_pipe
     if asr_pipe is None:
         initialize_asr_pipeline(device=device)
+    
+    # Create generate_kwargs without forced_decoder_ids to avoid conflict
+    generate_kwargs = {"task": "transcribe"}
+    if language:
+        generate_kwargs["language"] = language
+    
     return asr_pipe(
         ref_audio,
         chunk_length_s=30,
         batch_size=128,
-        generate_kwargs={"task": "transcribe", "language": language} if language else {"task": "transcribe"},
+        generate_kwargs=generate_kwargs,
         return_timestamps=False,
     )["text"].strip()
 
