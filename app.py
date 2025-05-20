@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, WebSocket
 from fastapi.responses import FileResponse, JSONResponse
 import torchaudio
 import tempfile
@@ -9,6 +9,10 @@ import sys
 from pathlib import Path
 import torch
 from f5_tts.api import F5TTS
+import datetime
+import json
+import tomli
+import soundfile as sf
 
 # Set up logging with more detailed format
 logging.basicConfig(
@@ -25,6 +29,15 @@ logger.info("Initializing TTS model...")
 device = "cuda" if torch.cuda.is_available() else "cpu"
 tts_model = F5TTS(model='F5TTS_v1_Base', device=device)
 logger.info("TTS model loaded successfully")
+
+# Load custom configuration
+try:
+    with open('custom.toml', 'rb') as f:  # tomli requires binary mode
+        custom_config = tomli.load(f)
+    logger.info("Successfully loaded custom configuration")
+except Exception as e:
+    logger.error(f"Error loading custom configuration: {str(e)}")
+    raise
 
 @app.post("/tts")
 async def tts(
@@ -106,6 +119,77 @@ async def tts(
             logger.info(f"Cleaned up temporary reference audio: {ref_path}")
         logger.info("="*50)
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy", "timestamp": datetime.datetime.now().isoformat()}
+
 @app.get("/")
 async def root():
-    return {"message": "F5-TTS API is running. Use POST /tts endpoint for text-to-speech conversion."} 
+    return {
+        "message": "F5-TTS API is running",
+        "endpoints": {
+            "POST /tts": "Generate speech from text",
+            "GET /health": "Health check endpoint"
+        }
+    }
+
+@app.websocket("/ws/tts")
+async def websocket_tts(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            # Wait for the start message
+            message = await websocket.receive_text()
+            
+            if message == "start":
+                await websocket.send_text("ready")
+                
+                # Receive the text to synthesize
+                text = await websocket.receive_text()
+                logger.info(f"Received text for synthesis: {text}")
+                
+                # Update config with the received text
+                inference_config = custom_config.copy()
+                inference_config['gen_text'] = text
+                
+                # Generate speech using the model
+                logger.info("Starting speech generation...")
+                audio_segment = tts_model.generate_speech(
+                    text=text,
+                    ref_path=inference_config['ref_audio']
+                )
+                
+                # Save the generated audio temporarily
+                output_path = Path("output") / "temp_generated.wav"
+                output_path.parent.mkdir(exist_ok=True)
+                tts_model.export_wav(audio_segment, str(output_path))
+                
+                # Get audio duration in milliseconds
+                audio_info = sf.info(str(output_path))
+                duration_ms = int(audio_info.duration * 1000)
+                
+                # Send duration to client
+                await websocket.send_json({
+                    "type": "duration",
+                    "duration_ms": duration_ms
+                })
+                
+                # Play the audio (you might want to implement actual audio playback here)
+                logger.info(f"Audio duration: {duration_ms}ms")
+                
+                # Send completion message
+                await websocket.send_text("done")
+                
+            elif message == "close":
+                break
+                
+    except Exception as e:
+        error_msg = f"Error during WebSocket TTS: {str(e)}\n{traceback.format_exc()}"
+        logger.error(error_msg)
+        await websocket.send_json({
+            "type": "error",
+            "message": str(e)
+        })
+    finally:
+        await websocket.close() 
