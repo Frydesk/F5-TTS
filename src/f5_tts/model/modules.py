@@ -438,6 +438,13 @@ class AttnProcessor:
         pe_attn_head: int | None = None,  # number of attention head to apply rope, None for all
     ):
         self.pe_attn_head = pe_attn_head
+        # Check if flash attention is available
+        self.use_flash_attention = False
+        try:
+            from flash_attn import flash_attn_func
+            self.use_flash_attention = True
+        except ImportError:
+            pass
 
     def __call__(
         self,
@@ -487,7 +494,22 @@ class AttnProcessor:
         else:
             attn_mask = None
 
-        x = F.scaled_dot_product_attention(query, key, value, attn_mask=attn_mask, dropout_p=0.0, is_causal=False)
+        # Use flash attention if available and enabled
+        if self.use_flash_attention and query.dtype in [torch.float16, torch.bfloat16]:
+            from flash_attn import flash_attn_func
+            # Convert mask to additive attention mask if needed
+            if attn_mask is not None:
+                attn_mask = attn_mask.to(query.dtype)
+                attn_mask = (1 - attn_mask) * -10000.0
+            # Flash attention expects (batch, seqlen, nheads, headdim)
+            query = query.transpose(1, 2)
+            key = key.transpose(1, 2)
+            value = value.transpose(1, 2)
+            x = flash_attn_func(query, key, value, attn_mask=attn_mask, dropout_p=0.0, causal=False)
+            x = x.transpose(1, 2)
+        else:
+            x = F.scaled_dot_product_attention(query, key, value, attn_mask=attn_mask, dropout_p=0.0, is_causal=False)
+            
         x = x.transpose(1, 2).reshape(batch_size, -1, attn.heads * head_dim)
         x = x.to(query.dtype)
 
@@ -509,7 +531,13 @@ class AttnProcessor:
 
 class JointAttnProcessor:
     def __init__(self):
-        pass
+        # Check if flash attention is available
+        self.use_flash_attention = False
+        try:
+            from flash_attn import flash_attn_func
+            self.use_flash_attention = True
+        except ImportError:
+            pass
 
     def __call__(
         self,
@@ -579,7 +607,22 @@ class JointAttnProcessor:
         else:
             attn_mask = None
 
-        x = F.scaled_dot_product_attention(query, key, value, attn_mask=attn_mask, dropout_p=0.0, is_causal=False)
+        # Use flash attention if available and enabled
+        if self.use_flash_attention and query.dtype in [torch.float16, torch.bfloat16]:
+            from flash_attn import flash_attn_func
+            # Convert mask to additive attention mask if needed
+            if attn_mask is not None:
+                attn_mask = attn_mask.to(query.dtype)
+                attn_mask = (1 - attn_mask) * -10000.0
+            # Flash attention expects (batch, seqlen, nheads, headdim)
+            query = query.transpose(1, 2)
+            key = key.transpose(1, 2)
+            value = value.transpose(1, 2)
+            x = flash_attn_func(query, key, value, attn_mask=attn_mask, dropout_p=0.0, causal=False)
+            x = x.transpose(1, 2)
+        else:
+            x = F.scaled_dot_product_attention(query, key, value, attn_mask=attn_mask, dropout_p=0.0, is_causal=False)
+
         x = x.transpose(1, 2).reshape(batch_size, -1, attn.heads * head_dim)
         x = x.to(query.dtype)
 

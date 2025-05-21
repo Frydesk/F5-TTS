@@ -154,13 +154,22 @@ def initialize_asr_pipeline(device: str = device, dtype=None):
             and not torch.cuda.get_device_name().endswith("[ZLUDA]")
             else torch.float32
         )
+    
+    # Check if flash_attn is available
+    use_flash_attn = False
+    try:
+        import flash_attn
+        use_flash_attn = True
+    except ImportError:
+        pass
+
     global asr_pipe
     asr_pipe = pipeline(
         "automatic-speech-recognition",
         model="openai/whisper-large-v3-turbo",
         torch_dtype=dtype,
         device=device,
-        model_kwargs={"use_flash_attention_2": True},  # Enable flash attention for better performance
+        model_kwargs={"use_flash_attention_2": use_flash_attn},  # Only enable if available
     )
 
 

@@ -29,10 +29,23 @@ app.add_middleware(
 )
 
 # Initialize TTS model
-logger.info("Initializing TTS model...")
+logger.info("Initializing TTS model (F5TTS_Base)...")
 device = "cuda" if torch.cuda.is_available() else "cpu"
-tts_model = F5TTS(model='F5TTS_v1_Base', device=device)
-logger.info("TTS model loaded successfully")
+logger.info(f"Using device: {device}")
+
+try:
+    tts_model = F5TTS(
+        model='F5TTS_Base',
+        device=device,
+        use_ema=True,
+        ode_method='euler'
+    )
+    logger.info("F5TTS_Base model loaded successfully")
+    logger.info("Model configuration loaded and verified")
+except Exception as e:
+    logger.error(f"Failed to load F5TTS_Base model: {str(e)}")
+    logger.error(traceback.format_exc())
+    raise
 
 # Load custom configuration
 try:
@@ -64,8 +77,10 @@ async def websocket_tts(websocket: WebSocket):
             if message == "start":
                 await websocket.send_text("ready")
                 
-                # Receive the text to synthesize
-                text = await websocket.receive_text()
+                # Receive the text to synthesize and clean it
+                raw_text = await websocket.receive_text()
+                # Remove JSON formatting if present
+                text = raw_text.replace('{"text": "', '').replace('"}', '').strip()
                 logger.info(f"Received text for synthesis: {text}")
                 
                 # Update config with the received text
@@ -101,11 +116,15 @@ async def websocket_tts(websocket: WebSocket):
                     "duration_ms": duration_ms
                 })
                 
-                # Play the audio (you might want to implement actual audio playback here)
-                logger.info(f"Audio duration: {duration_ms}ms")
+                # Play the audio
+                import winsound
+                winsound.PlaySound(str(output_path), winsound.SND_FILENAME)
                 
                 # Send completion message
-                await websocket.send_text("done")
+                await websocket.send_json({
+                    "type": "complete",
+                    "message": "Audio playback completed"
+                })
                 
             elif message == "close":
                 break

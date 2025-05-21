@@ -54,7 +54,7 @@ eval = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/SWivid/F5-TTS"
+Homepage = "https://github.com/josepheudave/F5-TTS"
 
 [project.scripts]
 "f5-tts_infer-cli" = "f5_tts.infer.infer_cli:main"
