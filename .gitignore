@@ -12,6 +12,7 @@ checkpoints/
 tests/
 output/
 configs/
+flash-attention/
 
 
 # Byte-compiled / optimized / DLL files
