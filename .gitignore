@@ -13,7 +13,7 @@ tests/
 output/
 configs/
 flash-attention/
-
+triton/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
