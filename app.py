@@ -8,6 +8,7 @@ from f5_tts.api import F5TTS
 import tomli
 import soundfile as sf
 import datetime
+import asyncio
 
 # Set up logging with more detailed format
 logging.basicConfig(
@@ -109,6 +110,7 @@ async def websocket_tts(websocket: WebSocket):
                 # Get audio duration in milliseconds
                 audio_info = sf.info(str(output_path))
                 duration_ms = int(audio_info.duration * 1000)
+                logger.info(f"Audio duration: {duration_ms}ms ({duration_ms/1000:.2f} seconds)")
                 
                 # Send duration to client
                 await websocket.send_json({
@@ -116,15 +118,29 @@ async def websocket_tts(websocket: WebSocket):
                     "duration_ms": duration_ms
                 })
                 
-                # Play the audio
+                # Log start time
+                start_time = datetime.datetime.now()
+                logger.info(f"Starting audio playback at: {start_time.strftime('%H:%M:%S.%f')[:-3]}")
+                
+                # Play the audio in a non-blocking way
                 import winsound
-                winsound.PlaySound(str(output_path), winsound.SND_FILENAME)
+                winsound.PlaySound(str(output_path), winsound.SND_FILENAME | winsound.SND_ASYNC)
+                
+                # Wait for the exact duration of the audio
+                await asyncio.sleep(duration_ms / 1000.0)  # Convert ms to seconds
+                
+                # Log end time
+                end_time = datetime.datetime.now()
+                actual_duration = (end_time - start_time).total_seconds() * 1000
+                logger.info(f"Finished audio playback at: {end_time.strftime('%H:%M:%S.%f')[:-3]}")
+                logger.info(f"Actual playback duration: {actual_duration:.2f}ms (expected: {duration_ms}ms)")
                 
                 # Send completion message
                 await websocket.send_json({
                     "type": "complete",
                     "message": "Audio playback completed"
                 })
+                logger.info("Sent completion message to client")
                 
             elif message == "close":
                 break
