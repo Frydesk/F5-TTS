@@ -30,6 +30,7 @@ dependencies = [
     "pydub",
     "pypinyin",
     "safetensors",
+    "sounddevice",
     "soundfile",
     "tomli",
     "torch>=2.0.0",

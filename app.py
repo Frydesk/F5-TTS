@@ -9,6 +9,8 @@ import tomli
 import soundfile as sf
 import datetime
 import asyncio
+import sounddevice as sd
+import numpy as np
 
 # Set up logging with more detailed format
 logging.basicConfig(
@@ -123,11 +125,17 @@ async def websocket_tts(websocket: WebSocket):
                 logger.info(f"Starting audio playback at: {start_time.strftime('%H:%M:%S.%f')[:-3]}")
                 
                 # Play the audio in a non-blocking way
-                import winsound
-                winsound.PlaySound(str(output_path), winsound.SND_FILENAME | winsound.SND_ASYNC)
+                # Load the audio file
+                audio_data, sample_rate = sf.read(str(output_path))
+                
+                # Start playback in a non-blocking way
+                sd.play(audio_data, sample_rate)
                 
                 # Wait for the exact duration of the audio
                 await asyncio.sleep(duration_ms / 1000.0)  # Convert ms to seconds
+                
+                # Stop playback
+                sd.stop()
                 
                 # Log end time
                 end_time = datetime.datetime.now()
