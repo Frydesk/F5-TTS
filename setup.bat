@@ -31,42 +31,5 @@ if not exist "models\vocos" mkdir "models\vocos"
 echo Downloading Vocos model...
 python -c "from huggingface_hub import snapshot_download; snapshot_download('charactr/vocos-mel-24khz', local_dir='models/vocos')"
 
-echo Building Flash Attention for Windows...
-if exist "flash-attention" rmdir /s /q "flash-attention"
-git clone https://github.com/Dao-AILab/flash-attention
-cd flash-attention
-git checkout -b v2.7.0.post2 v2.7.0.post2
-
-echo Downloading WindowsWhlBuilder_cuda.bat...
-powershell -Command "Invoke-WebRequest -Uri 'https://huggingface.co/lldacing/flash-attention-windows-wheel/raw/main/WindowsWhlBuilder_cuda.bat' -OutFile 'WindowsWhlBuilder_cuda.bat'"
-
-if not exist "WindowsWhlBuilder_cuda.bat" (
-    echo Failed to download WindowsWhlBuilder_cuda.bat. Please check your internet connection and try again.
-    exit /b 1
-)
-
-echo Building Flash Attention (this may take around 30 minutes)...
-call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
-if errorlevel 1 (
-    echo Failed to initialize Visual Studio environment. Please make sure Visual Studio 2022 is installed.
-    exit /b 1
-)
-
-call WindowsWhlBuilder_cuda.bat
-if errorlevel 1 (
-    echo Flash Attention build failed. Please check the error messages above.
-    exit /b 1
-)
-
-echo Installing built Flash Attention wheel...
-if not exist "dist\*.whl" (
-    echo No wheel file found in dist directory. Build may have failed.
-    exit /b 1
-)
-
-for %%f in (dist\*.whl) do pip install %%f
-
-cd ..
-
 echo Installation complete! You can now activate the environment using: conda activate f5-tts
 pause 
