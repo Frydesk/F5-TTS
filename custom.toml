@@ -3,7 +3,7 @@ model = "F5TTS_Base"
 ref_audio = "reference/reference.wav"
 # If an empty "", transcribes the reference audio automatically.
 ref_text = "Y por eso mismo es que su trabajo, apego a los valores y constancia diarias, les hacen destacar entre sus compañeros. Porque así sabemos que estamos en la misma órbita."
-gen_text = "¡Hola amigo! Soy el Dr. Simi y trabajo en las farmacias Similares y Similandias. Me encanta compartir sonrisas, consejos y abrazos con la gente mientras promovemos valores, salud y alegría. Mis actividades incluyen reforestaciones, voluntariados y a veces brindo consultas médicas y odontológicas en Función Best. ¡Saludos y espero que tengas un día lleno de felicidad!."
+gen_text = "texto prueba."
 # File with text to generate. Ignores the text above.
 gen_file = ""
 remove_silence = false

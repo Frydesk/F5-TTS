@@ -12,13 +12,8 @@ import asyncio
 import sounddevice as sd
 import numpy as np
 
-# Set up logging with more detailed format
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-logger = logging.getLogger(__name__)
+# Set up logging
+logger = logging.getLogger("fastapi")
 
 app = FastAPI()
 
@@ -79,6 +74,7 @@ async def websocket_tts(websocket: WebSocket):
             
             if message == "start":
                 await websocket.send_text("ready")
+                logger.info("➡️ Sent to client: 'ready'")
                 
                 # Receive the text to synthesize and clean it
                 raw_text = await websocket.receive_text()
@@ -119,6 +115,7 @@ async def websocket_tts(websocket: WebSocket):
                     "type": "duration",
                     "duration_ms": duration_ms
                 })
+                logger.info(f"➡️ Sent to client: duration info - {duration_ms}ms")
                 
                 # Log start time
                 start_time = datetime.datetime.now()
@@ -148,7 +145,20 @@ async def websocket_tts(websocket: WebSocket):
                     "type": "complete",
                     "message": "Audio playback completed"
                 })
-                logger.info("Sent completion message to client")
+                logger.info("➡️ Sent to client: completion message")
+                
+                # Add timeout handler after completion
+                try:
+                    logger.info("Waiting for next client message (30s timeout)...")
+                    # Wait for 30 seconds for any additional messages
+                    await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+                except asyncio.TimeoutError:
+                    logger.warning("⚠️ ====================================")
+                    logger.warning("⚠️ Connection timed out after 30 seconds")
+                    logger.warning("⚠️ Closing WebSocket connection")
+                    logger.warning("⚠️ ====================================")
+                    await websocket.close(code=1000, reason="Inactivity timeout")
+                    break
                 
             elif message == "close":
                 break
@@ -161,6 +171,7 @@ async def websocket_tts(websocket: WebSocket):
                 "type": "error",
                 "message": str(e)
             })
+            logger.info(f"➡️ Sent to client: error message - {str(e)}")
         except RuntimeError:
             # Connection might already be closed
             logger.warning("Could not send error message - connection may be closed")
