@@ -11,8 +11,13 @@ import datetime
 import asyncio
 import sounddevice as sd
 import numpy as np
+import os
 
 # Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger("fastapi")
 
 app = FastAPI()
@@ -35,8 +40,9 @@ try:
     tts_model = F5TTS(
         model='F5TTS_Base',
         device=device,
-        use_ema=True,
-        ode_method='euler'
+        use_ema=True,  # Use EMA for better quality
+        ode_method='euler',  # Default ODE solver
+        hf_cache_dir=os.path.join(os.path.expanduser('~'), '.cache', 'huggingface')  # Explicit cache dir
     )
     logger.info("F5TTS_Base model loaded successfully")
     logger.info("Model configuration loaded and verified")
@@ -88,17 +94,29 @@ async def websocket_tts(websocket: WebSocket):
                 
                 # Generate speech using the model
                 logger.info("Starting speech generation...")
-                wav, sr, spec = tts_model.infer(
-                    ref_file=inference_config['ref_audio'],
-                    ref_text="",  # Empty string for auto-transcription
-                    gen_text=text,
-                    target_rms=0.1,
-                    cross_fade_duration=0.15,
-                    nfe_step=32,
-                    cfg_strength=2.0,
-                    sway_sampling_coef=-1.0,
-                    speed=1.0
-                )
+                try:
+                    wav, sr, spec = tts_model.infer(
+                        ref_file=inference_config.get('ref_audio', ''),  # Reference audio path
+                        ref_text="",  # Empty string for auto-transcription
+                        gen_text=text,
+                        target_rms=0.1,  # Default RMS value for good volume
+                        cross_fade_duration=0.15,  # Smooth transitions
+                        nfe_step=32,  # Number of flow steps
+                        cfg_strength=2.0,  # Classifier-free guidance strength
+                        sway_sampling_coef=-1.0,  # Sway sampling for better quality
+                        speed=1.0,  # Normal speed
+                        show_info=logger.info,  # Use logger for model info
+                        progress=None  # Disable progress bar in API context
+                    )
+                    logger.info("Speech generation completed successfully")
+                except Exception as e:
+                    error_msg = f"Speech generation failed: {str(e)}"
+                    logger.error(error_msg)
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": error_msg
+                    })
+                    continue
                 
                 # Save the generated audio temporarily
                 output_path = Path("output") / "temp_generated.wav"
@@ -122,7 +140,6 @@ async def websocket_tts(websocket: WebSocket):
                 logger.info(f"Starting audio playback at: {start_time.strftime('%H:%M:%S.%f')[:-3]}")
                 
                 # Play the audio in a non-blocking way
-                # Load the audio file
                 audio_data, sample_rate = sf.read(str(output_path))
                 
                 # Start playback in a non-blocking way
@@ -150,7 +167,6 @@ async def websocket_tts(websocket: WebSocket):
                 # Add timeout handler after completion
                 try:
                     logger.info("Waiting for next client message (30s timeout)...")
-                    # Wait for 30 seconds for any additional messages
                     await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
                 except asyncio.TimeoutError:
                     logger.warning("⚠️ ====================================")
@@ -173,11 +189,9 @@ async def websocket_tts(websocket: WebSocket):
             })
             logger.info(f"➡️ Sent to client: error message - {str(e)}")
         except RuntimeError:
-            # Connection might already be closed
             logger.warning("Could not send error message - connection may be closed")
     finally:
         try:
             await websocket.close()
         except RuntimeError:
-            # Connection might already be closed
             pass 
