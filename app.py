@@ -12,11 +12,45 @@ import asyncio
 import sounddevice as sd
 import numpy as np
 import os
+import sys
+import codecs
 
-# Set up logging
+# Force UTF-8 encoding for stdout and stderr
+if sys.platform == 'win32':
+    # Python UTF-8 Mode
+    if hasattr(sys, 'set_utf8_mode'):
+        sys.set_utf8_mode(True)
+    
+    # Force console to use UTF-8
+    import ctypes
+    kernel32 = ctypes.windll.kernel32
+    kernel32.SetConsoleCP(65001)
+    kernel32.SetConsoleOutputCP(65001)
+
+# Create a custom StreamHandler that forces UTF-8
+class UTF8StreamHandler(logging.StreamHandler):
+    def __init__(self, stream=None):
+        super().__init__(stream)
+        self.stream = codecs.getwriter('utf-8')(sys.stdout.buffer) if stream is None else stream
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            stream = self.stream
+            stream.write(msg + self.terminator)
+            self.flush()
+        except Exception:
+            self.handleError(record)
+
+# Set up logging with UTF-8 encoding
+os.makedirs('logs', exist_ok=True)  # Ensure logs directory exists
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        UTF8StreamHandler(),
+        logging.FileHandler('logs/f5_tts_api.log', encoding='utf-8', mode='a')
+    ]
 )
 logger = logging.getLogger("fastapi")
 
