@@ -42,7 +42,6 @@ dependencies = [
     "vocos",
     "wandb",
     "x_transformers>=1.31.14",
-    "num2words",
 ]
 
 [project.optional-dependencies]
