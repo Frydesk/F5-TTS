@@ -18,6 +18,7 @@ import pyaudio
 from typing import Dict, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
+import time
 
 # Force UTF-8 encoding for stdout and stderr
 if sys.platform == 'win32':
