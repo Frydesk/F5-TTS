@@ -135,11 +135,13 @@ class WebSocketConnectionManager:
         self.connection_info: Dict[str, ConnectionInfo] = {}
         self.max_reconnect_attempts = 5
         self.reconnect_delay = 1  # seconds
+        self.playback_status: Dict[str, bool] = {}  # Track playback status for each client
 
     async def connect(self, websocket: WebSocket, client_id: str):
         await websocket.accept()
         self.active_connections[client_id] = websocket
         self.connection_info[client_id] = ConnectionInfo(state=ConnectionState.CONNECTED)
+        self.playback_status[client_id] = False
         logger.info(f"Client {client_id} connected")
 
     def disconnect(self, client_id: str):
@@ -147,6 +149,8 @@ class WebSocketConnectionManager:
             del self.active_connections[client_id]
         if client_id in self.connection_info:
             del self.connection_info[client_id]
+        if client_id in self.playback_status:
+            del self.playback_status[client_id]
         logger.info(f"Client {client_id} disconnected")
 
     async def handle_connection(self, websocket: WebSocket, client_id: str):
@@ -155,7 +159,13 @@ class WebSocketConnectionManager:
             while True:
                 try:
                     message = await websocket.receive_text()
-                    await self.handle_message(websocket, client_id, message)
+                    if message == "waiting" and self.playback_status.get(client_id, False):
+                        await websocket.send_json({
+                            "type": "status",
+                            "message": "still_playing"
+                        })
+                    else:
+                        await self.handle_message(websocket, client_id, message)
                 except WebSocketDisconnect:
                     await self.handle_disconnect(client_id)
                     break
@@ -227,6 +237,7 @@ class WebSocketConnectionManager:
 
         try:
             info.audio_playing = True
+            self.playback_status[client_id] = True
             
             # Update config with the received text
             inference_config = custom_config.copy()
@@ -294,7 +305,7 @@ class WebSocketConnectionManager:
             
             # Send completion message
             await websocket.send_json({
-                "type": "complete",
+                "type": "finish",
                 "message": "Audio playback completed"
             })
             
@@ -307,6 +318,7 @@ class WebSocketConnectionManager:
             })
         finally:
             info.audio_playing = False
+            self.playback_status[client_id] = False
 
 # Initialize the connection manager
 connection_manager = WebSocketConnectionManager()
