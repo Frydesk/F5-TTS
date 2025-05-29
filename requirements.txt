@@ -15,3 +15,4 @@ websockets>=11.0.3
 python-dotenv
 inflect
 toml>=0.10.2
+num2words>=0.5.13

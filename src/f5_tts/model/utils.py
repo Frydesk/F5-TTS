@@ -9,6 +9,7 @@ import jieba
 import torch
 from pypinyin import Style, lazy_pinyin
 from torch.nn.utils.rnn import pad_sequence
+from .number_normalizer import normalize_numbers_spanish
 
 
 # seed everything
@@ -149,6 +150,9 @@ def convert_char_to_pinyin(text_list, polyphone=True):
         )
 
     for text in text_list:
+        # Normalize numbers to Spanish words before processing
+        text = normalize_numbers_spanish(text)
+        
         char_list = []
         text = text.translate(custom_trans)
         for seg in jieba.cut(text):
