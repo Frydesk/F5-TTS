@@ -30,7 +30,12 @@ body:
       description: |
         Include detailed steps, screenshots, and logs. Use the correct markdown syntax for code blocks.
       placeholder: |
-        1. Create a new conda environment.
+        1. Create a new virtual environment:
+           ```bash
+           python -m venv .venv
+           .venv\Scripts\activate  # On Windows
+           source .venv/bin/activate  # On Linux/Mac
+           ```
         2. Clone the repository, install as local editable and properly set up.
         3. Run the command: `accelerate launch src/f5_tts/train/train.py`.
         4. Have following error message... (attach logs).

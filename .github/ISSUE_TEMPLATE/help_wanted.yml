@@ -32,7 +32,12 @@ body:
       description: |
         Include detailed steps, screenshots, and logs. Provide used prompt wav and text. Use the correct markdown syntax for code blocks.
       placeholder: |
-        1. Create a new conda environment.
+        1. Create a new virtual environment:
+           ```bash
+           python -m venv .venv
+           .venv\Scripts\activate  # On Windows
+           source .venv/bin/activate  # On Linux/Mac
+           ```
         2. Clone the repository and install as pip package.
         3. Run the command: `f5-tts_infer-gradio` with no ref_text provided.
         4. Stuck there with the following message... (attach logs and also error msg e.g. after ctrl-c).

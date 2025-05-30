@@ -4,7 +4,7 @@ import socket
 import time
 
 import numpy as np
-import pyaudio
+import sounddevice as sd
 
 
 logging.basicConfig(level=logging.INFO)
@@ -20,30 +20,26 @@ async def listen_to_F5TTS(text, server_ip="localhost", server_port=9998):
 
     async def play_audio_stream():
         nonlocal first_chunk_time
-        p = pyaudio.PyAudio()
-        stream = p.open(format=pyaudio.paFloat32, channels=1, rate=24000, output=True, frames_per_buffer=2048)
+        stream = sd.OutputStream(samplerate=24000, channels=1, dtype=np.float32)
 
         try:
-            while True:
-                data = await asyncio.get_event_loop().run_in_executor(None, client_socket.recv, 8192)
-                if not data:
-                    break
-                if data == b"END":
-                    logger.info("End of audio received.")
-                    break
+            with stream:
+                while True:
+                    data = await asyncio.get_event_loop().run_in_executor(None, client_socket.recv, 8192)
+                    if not data:
+                        break
+                    if data == b"END":
+                        logger.info("End of audio received.")
+                        break
 
-                audio_array = np.frombuffer(data, dtype=np.float32)
-                stream.write(audio_array.tobytes())
+                    audio_array = np.frombuffer(data, dtype=np.float32)
+                    stream.write(audio_array)
 
-                if first_chunk_time is None:
-                    first_chunk_time = time.time()
+                    if first_chunk_time is None:
+                        first_chunk_time = time.time()
 
         finally:
-            stream.stop_stream()
-            stream.close()
-            p.terminate()
-
-        logger.info(f"Total time taken: {time.time() - start_time:.4f} seconds")
+            logger.info(f"Total time taken: {time.time() - start_time:.4f} seconds")
 
     try:
         data_to_send = f"{text}".encode("utf-8")

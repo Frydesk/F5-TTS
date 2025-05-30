@@ -14,7 +14,6 @@ import numpy as np
 import os
 import sys
 import codecs
-import pyaudio
 from typing import Dict, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
@@ -69,7 +68,7 @@ logging.basicConfig(
         logging.FileHandler('logs/f5_tts_api.log', encoding='utf-8', mode='a')
     ]
 )
-logger = logging.getLogger("fastapi")
+logger = logging.getLogger("f5_tts")
 
 # Helper function for safe logging
 def safe_log(logger, level, message):
@@ -77,6 +76,8 @@ def safe_log(logger, level, message):
     if isinstance(message, str):
         message = message.replace('➡️', '->')
     getattr(logger, level)(message)
+    # Also print to console for immediate visibility
+    print(f"[{level.upper()}] {message}")
 
 app = FastAPI()
 
@@ -93,14 +94,28 @@ app.add_middleware(
 logger.info("Initializing TTS model (F5TTS_Base)...")
 device = "cuda" if torch.cuda.is_available() else "cpu"
 logger.info(f"Using device: {device}")
+logger.info(f"CUDA available: {torch.cuda.is_available()}")
+if torch.cuda.is_available():
+    logger.info(f"CUDA version: {torch.version.cuda}")
+    logger.info(f"Device count: {torch.cuda.device_count()}")
+    logger.info(f"Current device: {torch.cuda.current_device()}")
+    logger.info(f"Device name: {torch.cuda.get_device_name()}")
 
 try:
     tts_model = F5TTS(
         model='F5TTS_Base',
-        hf_cache_dir=os.path.join(os.path.expanduser('~'), '.cache', 'huggingface')  # Explicit cache dir
+        hf_cache_dir=os.path.join(os.path.expanduser('~'), '.cache', 'huggingface'),  # Explicit cache dir
+        device=device  # Explicitly pass the device
     )
     logger.info("F5TTS_Base model loaded successfully")
     logger.info("Model configuration loaded and verified")
+    # Add device verification logging
+    logger.info(f"Model device: {next(tts_model.ema_model.parameters()).device}")
+    logger.info(f"Vocoder device: {next(tts_model.vocoder.parameters()).device}")
+    # Add more detailed device info
+    if torch.cuda.is_available():
+        logger.info(f"Model memory allocated: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
+        logger.info(f"Model memory cached: {torch.cuda.memory_reserved() / 1024**2:.2f} MB")
 except Exception as e:
     logger.error(f"Failed to load F5TTS_Base model: {str(e)}")
     logger.error(traceback.format_exc())
@@ -248,77 +263,38 @@ class WebSocketConnectionManager:
                 ref_file=inference_config.get('ref_audio', ''),
                 ref_text=inference_config.get('ref_text', ''),
                 gen_text=text,
-                show_info=logger.info,
             )
+
+            # Play audio using sounddevice
+            try:
+                stream = sd.OutputStream(samplerate=sr, channels=1, dtype=np.float32)
+                with stream:
+                    stream.write(wav)
+            except Exception as audio_error:
+                error_msg = f"Audio playback error: {str(audio_error)}"
+                print(f"\n[ERROR] {error_msg}")
+                logger.error(error_msg)
+                raise
             
-            # Save and process audio
-            output_path = Path("output") / "temp_generated.wav"
-            output_path.parent.mkdir(exist_ok=True)
-            tts_model.export_wav(wav, str(output_path))
-            
-            # Get audio duration
-            audio_info = sf.info(str(output_path))
-            duration_ms = int(audio_info.duration * 1000)
-            
-            # Send duration to client
-            await websocket.send_json({
-                "type": "duration",
-                "duration_ms": duration_ms
-            })
-            
-            # Read and play audio
-            audio_data, sample_rate = sf.read(str(output_path))
-            if audio_data.dtype != np.float32:
-                audio_data = audio_data.astype(np.float32)
-            
-            # Create event for synchronization
-            event = asyncio.Event()
-            current_frame = 0
-            
-            def callback(outdata, frames, time, status):
-                nonlocal current_frame
-                if status:
-                    logger.info(f"Status: {status}")
-                
-                remaining = len(audio_data) - current_frame
-                if remaining == 0:
-                    raise sd.CallbackStop()
-                
-                valid_frames = min(remaining, frames)
-                outdata[:valid_frames] = audio_data[current_frame:current_frame + valid_frames].reshape(-1, 1)
-                if valid_frames < frames:
-                    outdata[valid_frames:] = 0
-                    raise sd.CallbackStop()
-                current_frame += valid_frames
-            
-            # Create and start stream
-            stream = sd.OutputStream(
-                samplerate=sample_rate,
-                channels=1,
-                callback=callback,
-                finished_callback=lambda: event.set(),
-                dtype=np.float32
-            )
-            
-            with stream:
-                await event.wait()
-            
-            # Send completion message
-            await websocket.send_json({
-                "type": "finish",
-                "message": "Audio playback completed"
-            })
-            
-        except Exception as e:
-            error_msg = f"Error during audio processing: {str(e)}"
-            logger.error(error_msg)
-            await websocket.send_json({
-                "type": "error",
-                "message": error_msg
-            })
-        finally:
             info.audio_playing = False
             self.playback_status[client_id] = False
+            await websocket.send_json({
+                "type": "status",
+                "message": "done"
+            })
+
+        except Exception as e:
+            error_msg = f"Error processing audio: {str(e)}"
+            print(f"\n[ERROR] {error_msg}")
+            print(f"\n[ERROR] Traceback:\n{traceback.format_exc()}")
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
+            info.audio_playing = False
+            self.playback_status[client_id] = False
+            await websocket.send_json({
+                "type": "error",
+                "message": str(e)
+            })
 
 # Initialize the connection manager
 connection_manager = WebSocketConnectionManager()

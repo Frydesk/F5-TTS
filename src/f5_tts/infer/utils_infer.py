@@ -186,6 +186,7 @@ def transcribe(ref_audio, language=None):
 
 
 def load_checkpoint(model, ckpt_path, device: str, dtype=None, use_ema=True):
+    print(f"Loading checkpoint on device: {device}")
     if dtype is None:
         dtype = (
             torch.float16
@@ -194,6 +195,7 @@ def load_checkpoint(model, ckpt_path, device: str, dtype=None, use_ema=True):
             and not torch.cuda.get_device_name().endswith("[ZLUDA]")
             else torch.float32
         )
+    print(f"Using dtype: {dtype}")
     model = model.to(dtype)
 
     ckpt_type = ckpt_path.split(".")[-1]
@@ -227,7 +229,9 @@ def load_checkpoint(model, ckpt_path, device: str, dtype=None, use_ema=True):
     del checkpoint
     torch.cuda.empty_cache()
 
-    return model.to(device)
+    model = model.to(device)
+    print(f"Checkpoint loaded on device: {next(model.parameters()).device}")
+    return model
 
 
 # load model for inference
@@ -243,6 +247,7 @@ def load_model(
     use_ema=True,
     device=device,
 ):
+    print(f"Loading model on device: {device}")
     if vocab_file == "":
         vocab_file = str(files("f5_tts").joinpath("infer/examples/vocab.txt"))
     tokenizer = "custom"
@@ -270,7 +275,8 @@ def load_model(
 
     dtype = torch.float32 if mel_spec_type == "bigvgan" else None
     model = load_checkpoint(model, ckpt_path, device, dtype=dtype, use_ema=use_ema)
-
+    model = model.eval()
+    print(f"Model loaded on device: {next(model.parameters()).device}")
     return model
 
 

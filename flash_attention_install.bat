@@ -1,13 +1,13 @@
 @echo off
 
-echo Activating f5-tts environment...
-call conda activate f5-tts
+echo Activating virtual environment...
+call .venv\Scripts\activate.bat
 
 echo This installation process can take several hours to complete.
 echo Installing dependencies...
 pip install ninja
 echo Installing flash-attention...
-pip install flash-attn --no-build-isolation
+uv pip install flash-attn --no-build-isolation
 echo Installing Triton from source...
 git clone https://github.com/triton-lang/triton.git
 cd triton
