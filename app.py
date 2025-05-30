@@ -265,23 +265,68 @@ class WebSocketConnectionManager:
                 gen_text=text,
             )
 
-            # Play audio using sounddevice
+            # Create an event to signal when playback is complete
+            playback_complete = asyncio.Event()
+            
+            # Convert wav to list for easier manipulation
+            wav_list = wav.tolist()
+            current_position = 0
+
+            def callback(outdata, frames, time, status):
+                nonlocal current_position
+                if status:
+                    print(f"Audio callback status: {status}")
+                
+                if current_position >= len(wav_list):
+                    outdata.fill(0)
+                    if not playback_complete.is_set():
+                        playback_complete.set()
+                    return
+                
+                # Calculate how many samples we can send
+                remaining = len(wav_list) - current_position
+                samples_to_send = min(frames, remaining)
+                
+                # Fill the output buffer
+                outdata[:samples_to_send, 0] = wav_list[current_position:current_position + samples_to_send]
+                if samples_to_send < frames:
+                    outdata[samples_to_send:, 0] = 0
+                
+                current_position += samples_to_send
+                
+                if current_position >= len(wav_list):
+                    if not playback_complete.is_set():
+                        playback_complete.set()
+
+            # Play audio using sounddevice with callback
             try:
-                stream = sd.OutputStream(samplerate=sr, channels=1, dtype=np.float32)
+                stream = sd.OutputStream(
+                    samplerate=sr,
+                    channels=1,
+                    dtype=np.float32,
+                    callback=callback
+                )
                 with stream:
-                    stream.write(wav)
+                    await playback_complete.wait()  # Wait for playback to complete
+                    # Add a small delay to ensure audio is fully played
+                    await asyncio.sleep(0.1)
             except Exception as audio_error:
                 error_msg = f"Audio playback error: {str(audio_error)}"
                 print(f"\n[ERROR] {error_msg}")
                 logger.error(error_msg)
                 raise
-            
-            info.audio_playing = False
-            self.playback_status[client_id] = False
-            await websocket.send_json({
-                "type": "status",
-                "message": "done"
-            })
+            finally:
+                info.audio_playing = False
+                self.playback_status[client_id] = False
+                # Ensure we send the done message
+                try:
+                    await websocket.send_json({
+                        "type": "status",
+                        "message": "done"
+                    })
+                    logger.info(f"Sent 'done' message to client {client_id}")
+                except Exception as e:
+                    logger.error(f"Failed to send 'done' message to client {client_id}: {str(e)}")
 
         except Exception as e:
             error_msg = f"Error processing audio: {str(e)}"
@@ -291,10 +336,13 @@ class WebSocketConnectionManager:
             logger.error(traceback.format_exc())
             info.audio_playing = False
             self.playback_status[client_id] = False
-            await websocket.send_json({
-                "type": "error",
-                "message": str(e)
-            })
+            try:
+                await websocket.send_json({
+                    "type": "error",
+                    "message": str(e)
+                })
+            except Exception as send_error:
+                logger.error(f"Failed to send error message to client {client_id}: {str(send_error)}")
 
 # Initialize the connection manager
 connection_manager = WebSocketConnectionManager()
