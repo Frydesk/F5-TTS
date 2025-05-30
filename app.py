@@ -307,6 +307,13 @@ class WebSocketConnectionManager:
                     callback=callback
                 )
                 with stream:
+                    # Send talking message to client right when audio starts playing
+                    await websocket.send_json({
+                        "type": "status",
+                        "message": "talking"
+                    })
+                    logger.info(f"Sent 'talking' message to client {client_id}")
+                    
                     await playback_complete.wait()  # Wait for playback to complete
                     # Add a small delay to ensure audio is fully played
                     await asyncio.sleep(0.1)
